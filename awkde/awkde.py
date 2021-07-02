@@ -209,6 +209,74 @@ class GaussianKDE(BaseEstimator):
 
         return self._mean, self._cov
 
+      
+    def predict2(self, X):
+        """
+        Evaluate KDE at given points X.
+
+        Parameters
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            Data points we want to evaluate the KDE at. Each row is a point,
+            each column is a feature.
+
+        Returns
+        -------
+        prob : array-like, shape (len(X))
+            The probability from the KDE pdf for each point in X.
+        """
+        if self._std_X is None:
+            raise ValueError("KDE has not been fitted to data yet.")
+
+        X = np.atleast_2d(X)
+        _, n_feat = X.shape
+        if n_feat != self._n_features:
+            raise ValueError("Dimensions of given points and KDE don't match.")
+
+        # Standardize given points to be in the same space as the KDE
+        X = standardize_nd_sample(X, mean=self._mean, cov=self._cov,
+                                  cholesky=True, ret_stats=False,
+                                  diag=self._diag_cov)
+
+        # No need to backtransform, because we only return y-values
+        return self._evaluate2(X, adaptive=self._adaptive)
+
+
+    def Sigmapredict(self, X):
+        """
+        Evaluate KDE at given points X.
+
+        Parameters
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            Data points we want to evaluate the KDE at. Each row is a point,
+            each column is a feature.
+
+        Returns
+        -------
+        prob : array-like, shape (len(X))
+            The probability from the KDE pdf for each point in X.
+        """
+        if self._std_X is None:
+            raise ValueError("KDE has not been fitted to data yet.")
+
+        X = np.atleast_2d(X)
+        _, n_feat = X.shape
+        if n_feat != self._n_features:
+            raise ValueError("Dimensions of given points and KDE don't match.")
+
+        # Standardize given points to be in the same space as the KDE
+        X = standardize_nd_sample(X, mean=self._mean, cov=self._cov,
+                                  cholesky=True, ret_stats=False,
+                                  diag=self._diag_cov)
+
+        # No need to backtransform, because we only return y-values
+        return self._Sigma_evaluate(X, adaptive=self._adaptive)
+
+      
+      
+      
+      
     def predict(self, X):
         """
         Evaluate KDE at given points X.
@@ -402,6 +470,70 @@ class GaussianKDE(BaseEstimator):
             print("- Nr. of data dim : {:d}".format(kde._n_features))
 
         return kde
+
+    def _evaluate2(self, X, adaptive):
+        """
+        Evaluate KDE at given points, returning the log-probability.
+
+        Parameters
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            Data points we want to evaluate the KDE at. Each row is a point,
+            each column is a feature.
+        adaptive : bool, optional
+            Wether to evaluate with fixed or with adaptive kernel.
+            (default: True)
+
+        Returns
+        -------
+        prob : array-like, shape (len(X))
+            The probability from the KDE PDF for each point in X.
+        """
+        n = self._n_kernels
+        d = self._n_features
+
+        # Get fixed or adaptive bandwidth
+        invbw = np.ones(n) / self._glob_bw
+        if adaptive:
+            invbw *= self._inv_loc_bw
+
+        # Total norm, including gaussian kernel norm with data covariance
+        norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov))# / n
+        return backend.kernel_coeff(self._std_X, X, invbw, norm)
+
+
+    # Private Methods
+    def _Sigma_evaluate(self, X, adaptive):
+        """
+        Evaluate KDE at given points, returning the log-probability.
+
+        Parameters
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            Data points we want to evaluate the KDE at. Each row is a point,
+            each column is a feature.
+        adaptive : bool, optional
+            Wether to evaluate with fixed or with adaptive kernel.
+            (default: True)
+
+        Returns
+        -------
+        prob : array-like, shape (len(X))
+            The probability from the KDE PDF for each point in X.
+        """
+        n = self._n_kernels
+        d = self._n_features
+
+        # Get fixed or adaptive bandwidth
+        invbw = np.ones(n) / self._glob_bw
+        if adaptive:
+            invbw *= self._inv_loc_bw
+
+        # Total norm, including gaussian kernel norm with data covariance
+        #norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov)) / n
+        return  np.sqrt(np.linalg.det(self._cov)) #self._inv_loc_bw #np.sqrt(np.linalg.det(self._cov))#backend.kernel_sum(self._std_X, X, invbw, norm)
+
+
 
     # Private Methods
     def _evaluate(self, X, adaptive):
