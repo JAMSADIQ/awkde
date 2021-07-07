@@ -209,7 +209,7 @@ class GaussianKDE(BaseEstimator):
 
         return self._mean, self._cov
       
-    def global_sigma(self, X):
+    def get_global_sigma(self, X):
         """
         Find the sigma (std dev) of the Gaussian kernel for the initial 
         global KDE
@@ -238,7 +238,7 @@ class GaussianKDE(BaseEstimator):
                                   cholesky=True, ret_stats=False,
                                   diag=self._diag_cov)
 
-        return self._Sigma_evaluate(X, adaptive=self._adaptive
+        return self._global_sigma(X)
 
     def predict(self, X):
         """
@@ -464,9 +464,10 @@ class GaussianKDE(BaseEstimator):
 
         return kde
 
-    def _evaluate2(self, X, adaptive):
+    # Private Methods
+    def _evaluate(self, X, adaptive):
         """
-        FIXME describe what this actually returns
+        Evaluate KDE at given points, returning the log-probability.
 
         Parameters
         -----------
@@ -491,73 +492,64 @@ class GaussianKDE(BaseEstimator):
             invbw *= self._inv_loc_bw
 
         # Total norm, including gaussian kernel norm with data covariance
-        norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov))# / n
-        return backend.kernel_coeff(self._std_X, X, invbw, norm)
-
-    # Private Methods
-    def _Sigma_evaluate(self, X, adaptive):
-        """
-        Evaluate KDE at given points, returning the log-probability.
-
-        Parameters
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Data points we want to evaluate the KDE at. Each row is a point,
-            each column is a feature.
-        adaptive : bool, optional
-            Wether to evaluate with fixed or with adaptive kernel.
-            (default: True)
-
-        Returns
-        -------
-        prob : array-like, shape (len(X))
-            The probability from the KDE PDF for each point in X.
-        """
-        n = self._n_kernels
-        d = self._n_features
-
-        # Get fixed or adaptive bandwidth
-        invbw = np.ones(n) / self._glob_bw
-        if adaptive:
-            invbw *= self._inv_loc_bw
-
-        # Total norm, including gaussian kernel norm with data covariance
-        #norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov)) / n
-        return  np.sqrt(np.linalg.det(self._cov)) #self._inv_loc_bw #np.sqrt(np.linalg.det(self._cov))#backend.kernel_sum(self._std_X, X, invbw, norm)
-
-
-
-    # Private Methods
-    def _evaluate(self, X, adaptive):
-        """
-        Evaluate KDE at given points, returning the log-probability.
-
-        Parameters
-        -----------
-        X : array-like, shape (n_samples, n_features)
-            Data points we want to evaluate the KDE at. Each row is a point,
-            each column is a feature.
-        adaptive : bool, optional
-            Wether to evaluate with fixed or with adaptive kernel.
-            (default: True)
-
-        Returns
-        -------
-        prob : array-like, shape (len(X))
-            The probability from the KDE PDF for each point in X.
-        """
-        n = self._n_kernels
-        d = self._n_features
-
-        # Get fixed or adaptive bandwidth
-        invbw = np.ones(n) / self._glob_bw
-        if adaptive:
-            invbw *= self._inv_loc_bw
-
-        # Total norm, including gaussian kernel norm with data covariance
         norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov)) / n
 
         return backend.kernel_sum(self._std_X, X, invbw, norm)
+
+    def _evaluate2(self, X, adaptive):
+        """
+        FIXME describe what this actually returns
+
+        Parameters
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            Data points we want to evaluate the KDE at. Each row is a point,
+            each column is a feature.
+        adaptive : bool, optional
+            Whether to evaluate with fixed or with adaptive kernel.
+            (default: True)
+
+        Returns
+        -------
+        kde_coeff : array-like, shape (len(X))
+            The KDE kernel coefficient for each point in X (separately normalized).
+        """
+        n = self._n_kernels
+        d = self._n_features
+
+        # Get fixed or adaptive bandwidth
+        invbw = np.ones(n) / self._glob_bw
+        if adaptive:
+            invbw *= self._inv_loc_bw
+
+        # Norm for each data sample including gaussian kernel norm with data covariance
+        norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov))
+        return backend.kernel_coeff(self._std_X, X, invbw, norm)
+
+    def _global_sigma(self, X):
+        """
+        Fetch the sigma (std dev) of the Gaussian kernel for the initial KDE
+
+        Parameters
+        -----------
+        X : array-like, shape (n_samples, n_features)
+            Data points we want to evaluate the KDE at. Each row is a point,
+            each column is a feature.
+
+        Returns
+        -------
+        prob : array-like, shape (len(X))
+            The probability from the KDE PDF for each point in X.
+        """
+        d = self._n_features
+
+        # Total norm, including gaussian kernel norm with data covariance
+        # given that invbw was = np.ones(n) / self._glob_bw
+        #n = self._n_kernels
+        #norm = invbw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov)) / n
+        #     = 1 / self._glob_bw**d / np.sqrt(np.linalg.det(2 * np.pi * self._cov)) / n
+        # compare norm = 1 / sqrt(2*pi*sigma) / n
+        return self._glob_bw**d * np.sqrt(np.linalg.det(self._cov))
 
     def _get_glob_bw(self, glob_bw):
         """Simple wrapper to handle string args given for global bw."""
