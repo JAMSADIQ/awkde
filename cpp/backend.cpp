@@ -97,8 +97,8 @@ py::array_t<T> kernel_coeff (const py::array_t<T>& X,
                 diff_ij = bY(i, k) - bX(j, k);
                 dist2_ij += diff_ij * diff_ij;
             }
-            // PDF_i = sum_{j in X} (norm_j * exp(-0.5 * dist2_ij * invbw_j^2)
-            //beval(i) += bnorm(j) * std::exp(-0.5 * dist2_ij *
+            //c_i coefficient =(norm_j * exp(-0.5 * dist2_ij * invbw_j^2)
+            //beval(i,j) = bnorm(j) * std::exp(-0.5 * dist2_ij *
               //                              binvbw(j) * binvbw(j));
             beval(i,j) = bnorm(j) * std::exp(-0.5 * dist2_ij *
                                             binvbw(j) * binvbw(j));
@@ -120,15 +120,15 @@ PYBIND11_PLUGIN(backend) {
            :toctree: _generate
 
            kernel_sum
-           kerne_coeff [I added this]
+           kernel_coeff [I added this]
     )pbdoc");
 
     auto docstr = R"pbdoc(
-                    kernel_sum
+                    kernel_sum and ker_coeff
 
                     Takes an array of kernel points `X` and points `Y` to
                     evaluate the KDE at and returns the KDE PDF values for
-                    each point in `Y`.
+                    each point in `Y` or coefficient in Kernel before sum that give KDE PDF
 
                     Parameters
                     ----------
@@ -147,6 +147,8 @@ PYBIND11_PLUGIN(backend) {
                     -------
                     eval : float array, shape (len(Y))
                         The probability from the KDE PDF for each point in `Y`.
+                    eval2 : float array, shape (len(Y))
+                        The coefficient of Kernel for each point in `Y`.    
                   )pbdoc";
     // Define the actual template typess
     m.def("kernel_coeff", &kernel_coeff<double>, docstr,
